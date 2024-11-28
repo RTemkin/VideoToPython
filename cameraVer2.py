@@ -92,7 +92,7 @@ class ObjectDetection:
                 class_name = self.classes[class_id]  # Получение имени класса
 
                 # Если объект является оружием, сохраняем изображение
-                # if "weapon" in class_name.lower():  # Замените "weapon" на нужный класс
+                #if "weapon" in class_name.lower():  # Замените "weapon" на нужный класс - изминение - сохранение кадра при любом классе оружия 
                 self.save_image(frame, class_name)
 
                 # Воспроизведение звука при обнаружении объекта
