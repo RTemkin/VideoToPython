@@ -68,7 +68,7 @@ class ObjectDetection:
             print(f"Ошибка отправки изображения в Telegram: {e}")
 
     def play_sound(self, class_name):
-        """Воспроизведение звука в отдельном потоке"""
+        """Воспроизведение звука в отдельном потоке"""  
         current_time = time.time()  # Получение текущего времени
         # Проверка, достаточно ли времени прошло для воспроизведения звука
         if current_time - self.last_sound_time.get(class_name, 0) >= self.sound_cooldown:
