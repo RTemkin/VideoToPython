@@ -22,8 +22,8 @@ class ObjectDetection:
         self.classes = self.model.names
 
         # Параметры для отправки сообщений в Telegram
-        self.chat_id = '517481295'  # Укажите ваш chat_id
-        self.bot_token = '7593173531:AAEELEnidKCwI7bHV5pnRiOfFNoZPkqQ86w'  # Укажите ваш bot_token
+        self.chat_id = '-1002496545090' # Укажите ваш chat_id
+        self.bot_token = '7535382168:AAHLnaloofQO4xGpSoiXqAdOYL3-3Ip9COM'  # Укажите ваш bot_token
         self.bot = telegram.Bot(token=self.bot_token)  # Создание экземпляра бота
         
         # Папки для сохранения видео и изображений
