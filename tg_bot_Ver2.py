@@ -4,10 +4,10 @@ import telebot
 BOT_TOKEN = '7535382168:AAHLnaloofQO4xGpSoiXqAdOYL3-3Ip9COM'  # Замените на свой токен бота
 bot = telebot.TeleBot(BOT_TOKEN)
 
-GROUP_CHAT_ID = '517481295'
+GROUP_CHAT_ID = '-1002496545090'
 
 # Путь к файлу с изображением. Замените на ваш путь.
-PHOTO_PATH = 'D:/VideoToPython/аватары для бота/42c964feae1311ef81cf929d34e956e8.png'  # Например: 'images/my_photo.jpg'
+PHOTO_PATH = 'D:/VideoToPython/аватары для бота/e3255349ae1211efaf412ec004ef4c50.png'  # Например: 'images/my_photo.jpg'
 
 
 @bot.message_handler(commands=['sendphoto'])
