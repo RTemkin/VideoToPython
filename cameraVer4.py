@@ -1,21 +1,22 @@
-import cv2  # Импорт библиотеки OpenCV для работы с видео и изображениями
-import torch  # Импорт библиотеки PyTorch для работы с моделями глубокого обучения
-from ultralytics import YOLO  # Импортирует класс YOLO из библиотеки Ultralytics для детекции объектов
-import numpy as np  # Импорт библиотеки NumPy для работы с массивами
-from datetime import datetime  # Импорт модуля datetime для работы с датой и временем
-import os  # Импорт модуля os для взаимодействия с файловой системой
-import threading  # Импорт модуля threading для работы с потоками
-import time  # Импорт модуля time для работы со временем
-import telebot  # Импорт библиотеки для работы с Telegram Bot API
-from playsound import playsound  # Импорт функции playsound для воспроизведения звуковых файлов
-import argparse  # Импорт библиотеки argparse для обработки аргументов командной строки
+import cv2
+import torch
+from ultralytics import YOLO
+import numpy as np
+from datetime import datetime
+import os
+import argparse
+from playsound import playsound
+import threading
+import time
+import telegram
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+import nest_asyncio
+
+nest_asyncio.apply()
 
 class ObjectDetection:
-    def __init__(self, telegram_token, chat_id):  # Исправлено на __init__
-        # Инициализация бота Telegram
-        self.bot = telebot.TeleBot(telegram_token)
-        self.chat_id = chat_id
-        
+    def __init__(self):
         # Выбор устройства для вычислений: используем CUDA, если доступно, иначе - CPU
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         
@@ -24,14 +25,21 @@ class ObjectDetection:
         
         # Получение списка классов, использующихся в модели
         self.classes = self.model.names
-
+        
+        # Параметры для отправки сообщений в Telegram
+        self.chat_id = '-1002496545090'  # Укажите ваш chat_id
+        self.bot_token = '7535382168:AAHLnaloofQO4xGpSoiXqAdOYL3-3Ip9COM'  # Укажите ваш bot_token
+        self.bot = telegram.Bot(token=self.bot_token)  # Создание экземпляра бота
+        
         # Папки для сохранения видео и изображений
         self.output_dir = "D:/VideoToPython/recorded_videos/"
         self.save_images_dir = "D:/VideoToPython/saved_images/"
         
         # Создание директорий, если они не существуют
-        os.makedirs(self.output_dir, exist_ok=True)
-        os.makedirs(self.save_images_dir, exist_ok=True)
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+        if not os.path.exists(self.save_images_dir):
+            os.makedirs(self.save_images_dir)
         
         # Параметры для фильтрации результатов детекции
         self.conf_threshold = 0.5  # Порог уверенности для детекции
@@ -44,29 +52,27 @@ class ObjectDetection:
         # Путь к звуковому файлу
         self.sound_file = "D:/VideoToPython/hazard-warning.mp3"
 
-    def create_video_writer(self, video_cap, output_filename):
-        """Создание объекта для записи видео"""
-        frame_width = int(video_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        frame_height = int(video_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = int(video_cap.get(cv2.CAP_PROP_FPS))  # Количество кадров в секунду
-        fourcc = cv2.VideoWriter_fourcc(*'XVID')  # Кодек для записи видео
-        output_path = os.path.join(self.output_dir, output_filename)  # Полный путь для сохранения видео
-        return cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
-
     def save_image(self, frame, class_name):
-        """Сохранение изображения при обнаружении объекта и отправка в Telegram"""
+        """Сохранение изображения при обнаружении объекта"""
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')  # Получение текущего времени как строки
-        image_filename = f'{class_name}_{timestamp}.jpg'  # Форматирование имени файла
+        image_filename = f'{class_name}_{timestamp}.jpg'  # Форматирование имени файла с классом и временем
         image_path = os.path.join(self.save_images_dir, image_filename)  # Полный путь для сохранения изображения
         cv2.imwrite(image_path, frame)  # Сохранение изображения
         print(f"Сохранено изображение: {image_path}")  # Сообщение в консоль
 
-        self.send_photo_to_telegram(image_path)  # Отправка изображения в Telegram
+        # Отправка изображения в Telegram
+        self.send_image_to_telegram(image_path)
 
-    def send_photo_to_telegram(self, image_path):
-        """Отправка фотографии в группу Telegram"""
-        with open(image_path, 'rb') as photo:
-            self.bot.send_photo(self.chat_id, photo)
+    async def send_image_to_telegram(self, image_path):
+        """Отправка изображения в Telegram"""
+        try:
+            with open(image_path, 'rb') as photo:
+                await self.bot.send_photo(chat_id=self.chat_id, photo=photo)
+            print(f"Изображение отправлено в Telegram: {image_path}")
+        except Exception as e:
+            print(f"Ошибка отправки изображения в Telegram: {e}")
+
+
 
     def play_sound(self, class_name):
         """Воспроизведение звука в отдельном потоке"""  
@@ -81,49 +87,98 @@ class ObjectDetection:
             except Exception as e:
                 print(f"Ошибка воспроизведения звука: {e}")  # Обработка ошибок воспроизведения звука
 
+    def create_video_writer(self, video_cap, output_filename):
+        """Создание объекта для записи видео"""
+        # Получение параметров видео
+        frame_width = int(video_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        frame_height = int(video_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = int(video_cap.get(cv2.CAP_PROP_FPS))  # Количество кадров в секунду
+        
+        # Кодек для записи видео
+        fourcc = cv2.VideoWriter_fourcc(*'XVID')  
+        
+        # Полный путь для сохранения видео
+        output_path = os.path.join(self.output_dir, output_filename)  
+        
+        # Возвращает объект записи видео
+        return cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
+
+    def process_frame(self, frame):
+        """Обработка одного кадра для распознавания объектов"""
+        # Выполнение детекции объектов на кадре
+        results = self.model(frame, conf=self.conf_threshold, iou=self.iou_threshold)  
+        for result in results:
+            boxes = result.boxes.cpu().numpy()  # Получение координат боксов в формате NumPy
+            for box in boxes:
+                # Извлечение координат бокса, ID класса и уверенности
+                x1, y1, x2, y2 = box.xyxy[0].astype(int)
+                class_id = int(box.cls[0])
+                conf = box.conf[0]
+                class_name = self.classes[class_id]  # Получение имени класса
+
+                # Если объект является оружием, сохраняем изображение
+                #if "weapon" in class_name.lower():  # Замените "weapon" на нужный класс - изминение - сохранение кадра при любом классе оружия 
+                self.save_image(frame, class_name)
+
+                # Воспроизведение звука при обнаружении объекта
+                self.play_sound(class_name)
+
+                # Рисование бокса вокруг обнаруженного объекта
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+                label = f'{class_name} {conf:.2f}'  # Форматирование ярлыка с именем класса и уверенности
+                # Добавление текста на изображение
+                cv2.putText(frame, label, (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+        return frame  # Возвращаем обработанный кадр
+
     def detect_objects(self, source):
-        """Функция для детекции объектов"""
-        cap = cv2.VideoCapture(source)
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                break
+        """Запуск детекции объектов"""
+        # Создание объекта видеозахвата в зависимости от источника
+        if source.isdigit():  # Если источник - это номер камеры
+            cap = cv2.VideoCapture(int(source))
+        elif source.startswith(('rtsp://', 'http://', 'https://')):  # Если источник - URL
+            cap = cv2.VideoCapture(source)
+        else:  # В остальных случаях - путь к файлу
+            cap = cv2.VideoCapture(source)
 
-            results = self.model(frame)
-            for result in results:
-                boxes = result.boxes  # Получение боксов
-                for box in boxes:
-                    if box.conf >= self.conf_threshold:  # Проверка порога уверенности
-                        class_id = int(box.cls)
-                        class_name = self.classes[class_id]
-                        # Рисуем прямоугольник вокруг найденного объекта
-                        cv2.rectangle(frame, (int(box.x1), int(box.y1)), (int(box.x2), int(box.y2)), (255, 0, 0), 2)
-                        cv2.putText(frame, class_name, (int(box.x1), int(box.y1) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
-                        
-                        # Сохранение изображения и воспроизведение звука
-                        self.save_image(frame, class_name)
-                        self.play_sound(class_name)
+        # Проверка на успешное открытие источника
+        if not cap.isOpened():
+            print("Ошибка при открытии источника видео")
+            return
 
-            cv2.imshow("Detections", frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-        cap.release()
-        cv2.destroyAllWindows()
+        # Формирование имени для выходного видео
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        output_filename = f'detection_{timestamp}.avi'
+        video_writer = self.create_video_writer(cap, output_filename)  # Создание объекта для записи видео
 
+        # Основной цикл обработки кадров
+        try:
+            while True:
+                ret, frame = cap.read()  # Чтение кадра
+                if not ret:  # Если чтение прошло неудачно
+                    print("Достигнут конец видео или произошла ошибка при чтении кадра")
+                    break
+
+                processed_frame = self.process_frame(frame)  # Обработка кадра
+                video_writer.write(processed_frame)  # Запись обработанного кадра в файл
+                cv2.imshow('Object Detection', processed_frame)  # Отображение обработанного кадра в окне
+
+                # Выход при нажатии 'q'
+                if cv2.waitKey(1) & 0xFF == ord('q'):  
+                    break
+        finally:
+            cap.release()  # Освобождение видеозахвата
+            video_writer.release()  # Освобождение видеозаписи
+            cv2.destroyAllWindows()  # Закрытие всех окон OpenCV
 
 def main():
     parser = argparse.ArgumentParser(description="Object Detection with YOLOv8")
-    parser.add_argument("--source", type=str, default="0",
+    parser.add_argument("--source", type=str, default="0", # "0" - web камера, D:/newproectYOLO/new_YOLOv8_собств_детекция/video_test3.mp4
                         help="Source of video. Can be camera index, video file path, or RTSP/HTTP URL")
     args = parser.parse_args()
 
-    # Замените на свои токен и chat_id
-    telegram_token = '7535382168:AAHLnaloofQO4xGpSoiXqAdOYL3-3Ip9COM'
-    chat_id = '-1002496545090'
-    
-    detector = ObjectDetection(telegram_token, chat_id)
+    detector = ObjectDetection()
     detector.detect_objects(args.source)
-
 
 if __name__ == "__main__":
     main()
