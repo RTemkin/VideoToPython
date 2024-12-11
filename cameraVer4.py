@@ -31,7 +31,9 @@ class ObjectDetection:
         self.classes = self.model.names
 
         # Параметры для отправки сообщений в Telegram
-       
+        # Инициализация бота
+        self.bot = Bot(token=API_TOKEN)
+        self.dp = Dispatcher()
         
         # Папки для сохранения видео и изображений
         self.output_dir = "D:/VideoToPython/recorded_videos/"
