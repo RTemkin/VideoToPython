@@ -1,35 +1,37 @@
-import cv2
-import torch
-from ultralytics import YOLO
-import numpy as np
-from datetime import datetime
-import os
-import argparse
-from playsound import playsound
-import threading
-import time
-import telegram
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
-import nest_asyncio
+import cv2  # Импорт библиотеки OpenCV для работы с видео и изображениями
+import torch  # Импорт библиотеки PyTorch для работы с моделями глубокого обучения
+from ultralytics import YOLO  # Импортирует класс YOLO из библиотеки Ultralytics для детекции объектов
+import numpy as np  # Импорт библиотеки NumPy для работы с массивами
+from datetime import datetime  # Импорт модуля datetime для работы с датой и временем
+import os  # Импорт модуля os для взаимодействия с файловой системой
+import argparse  # Импорт модуля argparse для обработки аргументов командной строки
+from playsound import playsound  # Импорт функции playsound для воспроизведения звуковых файлов
+import threading  # Импорт модуля threading для работы с потоками
+import time  # Импорт модуля time для работы со временем
 
-nest_asyncio.apply()
+import asyncio
+from aiogram import Bot, Dispatcher, types
+from aiogram.types import Message, InputFile, FSInputFile
+from aiogram.filters import Command
+
+
+# Telegram Bot API Token and Chat ID
+API_TOKEN = '7535382168:AAHLnaloofQO4xGpSoiXqAdOYL3-3Ip9COM'  # Замените на токен вашего бота
+CHAT_ID = '-1002496545090' 
 
 class ObjectDetection:
     def __init__(self):
         # Выбор устройства для вычислений: используем CUDA, если доступно, иначе - CPU
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'  
         
         # Загрузка предобученной модели YOLO
         self.model = YOLO('D:/newProjectYOLOVer2/runs/detect/train/weights/best.pt').to(self.device)
         
         # Получение списка классов, использующихся в модели
         self.classes = self.model.names
-        
+
         # Параметры для отправки сообщений в Telegram
-        self.chat_id = '-1002496545090'  # Укажите ваш chat_id
-        self.bot_token = '7535382168:AAHLnaloofQO4xGpSoiXqAdOYL3-3Ip9COM'  # Укажите ваш bot_token
-        self.bot = telegram.Bot(token=self.bot_token)  # Создание экземпляра бота
+       
         
         # Папки для сохранения видео и изображений
         self.output_dir = "D:/VideoToPython/recorded_videos/"
@@ -52,6 +54,14 @@ class ObjectDetection:
         # Путь к звуковому файлу
         self.sound_file = "D:/VideoToPython/hazard-warning.mp3"
 
+    async def send_photo_to_telegram(self, image_path):
+        """Отправка изображения в Telegram"""
+        try:
+            photo = FSInputFile(image_path)
+            await self.bot.send_photo(chat_id=CHAT_ID, photo=photo, caption='Обнаружен объект!')
+        except Exception as e:
+            print(f"Ошибка при отправке изображения в Telegram: {e}")
+
     def save_image(self, frame, class_name):
         """Сохранение изображения при обнаружении объекта"""
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')  # Получение текущего времени как строки
@@ -61,17 +71,7 @@ class ObjectDetection:
         print(f"Сохранено изображение: {image_path}")  # Сообщение в консоль
 
         # Отправка изображения в Telegram
-        self.send_image_to_telegram(image_path)
-
-    async def send_image_to_telegram(self, image_path):
-        """Отправка изображения в Telegram"""
-        try:
-            with open(image_path, 'rb') as photo:
-                await self.bot.send_photo(chat_id=self.chat_id, photo=photo)
-            print(f"Изображение отправлено в Telegram: {image_path}")
-        except Exception as e:
-            print(f"Ошибка отправки изображения в Telegram: {e}")
-
+        asyncio.run(self.send_photo_to_telegram(image_path))
 
 
     def play_sound(self, class_name):
